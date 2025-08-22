@@ -131,7 +131,7 @@ const handleSendMessage = async () => {
   abortController = new AbortController();
 
   try {
-    const response = await fetch('/chat-stream', {
+    const response = await fetch('http://localhost:8033/chat-stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: userMessage, history: messages.value.slice(0, -2) }),
