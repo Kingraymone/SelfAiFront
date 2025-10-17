@@ -10,7 +10,7 @@
         <el-dropdown>
           <span class="el-dropdown-link">
             <el-avatar size="small" icon="UserFilled" />
-            <span class="username">王总</span>
+            <span class="username">小王</span>
             <el-icon class="el-icon--right"><arrow-down /></el-icon>
           </span>
           <template #dropdown>
