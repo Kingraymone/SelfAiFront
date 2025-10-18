@@ -134,7 +134,7 @@ const handleSendMessage = async () => {
     const response = await fetch('http://localhost:8033/chat-stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: userMessage, history: messages.value.slice(0, -2) }),
+      body: JSON.stringify({ query: userMessage }),
       signal: abortController.signal,
     });
 
@@ -180,6 +180,7 @@ const handleSendMessage = async () => {
   padding: 20px;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
 }
 
 .message-container {
@@ -203,12 +204,16 @@ const handleSendMessage = async () => {
 .message-container.message-user .message-avatar { background-color: var(--el-color-success-light-3); }
 
 .message-bubble {
-  padding: 8px 14px;
+  padding: 6px 14px;
   border-radius: 18px;
   line-height: 1.6;
   word-wrap: break-word;
   white-space: pre-wrap;
   position: relative;
+}
+
+.message-bubble :deep(p) {
+  margin: 0;
 }
 
 .message-user .message-bubble {
