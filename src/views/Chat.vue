@@ -60,6 +60,7 @@ import { ref, nextTick, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Promotion } from '@element-plus/icons-vue';
 import MarkdownIt from 'markdown-it';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
 
 const inputText = ref('');
 const messages = ref([
@@ -93,12 +94,7 @@ onMounted(focusInput);
 const stopStreaming = () => {
   if (abortController) {
     abortController.abort();
-    abortController = null;
   }
-  isStreaming.value = false;
-  streamingMessageId.value = null;
-  ElMessage.warning('已停止生成');
-  focusInput();
 };
 
 const askSuggested = (question) => {
@@ -111,7 +107,6 @@ const handleKeydown = (e) => {
     e.preventDefault(); // 阻止默认的换行行为
     handleSendMessage();
   }
-  // 如果按下了Shift+Enter，则不执行任何操作，允许默认的换行行为
 };
 
 const handleSendMessage = async () => {
@@ -120,49 +115,62 @@ const handleSendMessage = async () => {
 
   messages.value.push({ id: Date.now(), role: 'user', content: userMessage });
   inputText.value = '';
-  scrollToBottom();
+  await scrollToBottom();
 
   isStreaming.value = true;
   const assistantMessage = { id: Date.now() + 1, role: 'assistant', content: '' };
   streamingMessageId.value = assistantMessage.id;
   messages.value.push(assistantMessage);
-  scrollToBottom();
+  await scrollToBottom();
 
   abortController = new AbortController();
 
-  try {
-    const response = await fetch('http://localhost:8033/chat-stream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: userMessage }),
-      signal: abortController.signal,
-    });
+  await fetchEventSource('http://localhost:8033/chat-sse', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'text/event-stream',
+    },
+    body: JSON.stringify({ query: userMessage }),
+    signal: abortController.signal,
+    openWhenHidden: true,
 
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    onmessage(event) {
+      console.info(event);
+      if (event.data === '[DONE]') {
+        stopStreaming(); // Gracefully stop the connection
+        return;
+      }
+      if (event.data) {
+        const assistantMessage = messages.value.find(m => m.id === streamingMessageId.value);
+        if (assistantMessage) {
+          assistantMessage.content += event.data;
+        }
+        scrollToBottom();
+      }
+    },
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder('utf-8');
+    onclose() {
+      isStreaming.value = false;
+      streamingMessageId.value = null;
+      abortController = null;
+      focusInput();
+    },
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      assistantMessage.content += chunk;
-      scrollToBottom();
-    }
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      assistantMessage.content += '\n(已停止)';
-    } else {
-      assistantMessage.content = `抱歉，查询时遇到问题: ${error.message}。`;
-      ElMessage.error('查询失败，请稍后重试');
-    }
-  } finally {
-    isStreaming.value = false;
-    streamingMessageId.value = null;
-    abortController = null;
-    focusInput();
-  }
+    onerror(err) {
+      const assistantMessage = messages.value.find(m => m.id === streamingMessageId.value);
+      if (assistantMessage) {
+        if (err.name === 'AbortError') {
+          assistantMessage.content += '\n(已停止)';
+        } else {
+          assistantMessage.content = `抱歉，查询时遇到问题: ${err.message}。`;
+          ElMessage.error('查询失败，请稍后重试');
+        }
+      }
+      // The onclose() callback will be called automatically.
+      throw err; // Rethrow to ensure the connection is closed
+    },
+  });
 };
 </script>
 

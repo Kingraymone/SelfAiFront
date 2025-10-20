@@ -49,7 +49,7 @@
       <div class="input-box border-t p-4 bg-gray-50">
         <el-input
             v-model="inputText"
-            placeholder="请输入您的问题，例如：查询日活跃用户数指标"
+            placeholder="请输入您的问题，例如：查询日活跃用户数指标2"
             clearable
             @keyup.enter="handleQuery"
         >
